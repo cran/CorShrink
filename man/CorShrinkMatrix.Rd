@@ -2,21 +2,20 @@
 % Please edit documentation in R/CorShrinkMatrix.R
 \name{CorShrinkMatrix}
 \alias{CorShrinkMatrix}
-\title{Adaptive shrinkage of a matrix of correlations.}
+\title{Adaptive shrinkage of a matrix of pairwise correlations.}
 \usage{
 CorShrinkMatrix(cormat, nsamp = NULL, zscore_sd = NULL, thresh_up = 0.99,
-  thresh_down = -0.99, image_original = FALSE, image_corshrink = FALSE,
-  tol = 1e-06, image.control = list(), optmethod = "mixEM",
+  thresh_down = -0.99, image = c("both", "original", "corshrink", "output",
+  "null"), tol = 1e-06, image.control = list(), report_model = FALSE,
   ash.control = list())
 }
 \arguments{
-\item{cormat}{A table of correlations - not necessarily a correlation matrix.
-May contain NAs as well.}
+\item{cormat}{A matrix of pairwise correlations - not necessarily a correlation matrix.
+NAs in this matrix are treated as 0.}
 
 \item{nsamp}{An integer or a matrix denoting the number of samples for
 each pair of variables over which the correlation has been computed.
-If the user specifies \code{zscore_sd}, then \code{nsamp} is set
-to NULL and is no longer used.}
+Only used when \code{zscore_sd} is not provided.}
 
 \item{zscore_sd}{A matrix of the sandard error of the Fisher z-scores for each pair of
 variables. May contain NA-s as well. The NA-s in this matrix must
@@ -25,15 +24,18 @@ used as default over the the asymptotic formulation using \code{nsamp}.
 When set to NULL, asymptotic distribution of the Fisher z-scores is used
 using \code{nsamp}.}
 
-\item{thresh_up}{Upper threshold for correlations. Defaults to 0.99}
+\item{thresh_up}{Upper threshold for correlations in \code{cormat}. Defaults to 0.99}
 
-\item{thresh_down}{Lower threshold for correlations. Defaults to -0.99}
+\item{thresh_down}{Lower threshold for correlations in \code{cormat}. Defaults to -0.99}
 
-\item{image_original}{if TRUE, plots an image of the non-shrunk original matrix
-of correlations.}
-
-\item{image_corshrink}{if TRUE, plots an image of the shrunk matrix
-of correlations.}
+\item{image}{character. options for plotting the original or the corshrink matrix.
+If \code{image = "both"}, then the function outputs both the plot
+for original and shrunk correlationmatrix. If \code{image = "original"},
+then the function outputs the correlation plot for the original matrix only.
+If \code{image = "corshrink"}, then the function outputs the correlation plot
+for the CorShrink matrix only.If \code{image = "output"}, then the function
+outputs the saved ggplot figure without displaying it. If \code{image = "null"},
+no image is output. Defaults to "both".}
 
 \item{tol}{The tolerance chosen to check how far apart the CorShrink matrix is from the nearest
 positive definite matrix before applying PD completion.}
@@ -41,34 +43,34 @@ positive definite matrix before applying PD completion.}
 \item{image.control}{Control parameters for the image when
 \code{image_original = TRUE} and/or \code{image_corshrink = TRUE}.}
 
-\item{optmethod}{The optimization method for EM algorithm - can be one of
-two techniques \code{mixEM} (mixture EM) and \code{mixVBEM}
-(mixture Variational Bayes EM) approaches.The default approach
-is \code{mixEM}.}
+\item{report_model}{if TRUE, outputs the full adaptive shrinkage output, else outputs the shrunken vector.
+Defaults to FALSE.}
 
 \item{ash.control}{The control parameters for adaptive shrinkage}
 }
 \value{
-Returns a adaptively shrunk version of the sample correlation matrix before
-        and after PD completion.
+If \code{report_model = FALSE}, returns a list with adaptively shrunk version
+        of the sample correlation matrix both before (\code{ash_cor_only}) and after
+        PD completion (\code{ash_cor_PD}). If \code{report_model = TRUE}, then the
+        function also returns all the details of the adaptive shrinkage model output.
 }
 \description{
-This function performs adaptive shrinkage of a sample correlation matrix using a
-mixture normal prior on Fisher z-scores with wide range of grid variances.
-The method is similar to the adaptive shrinkage method for modeling false discovery rates proposed
-in Stephens 2016 (see reference).
+This function performs adaptive shrinkage of a matrix of pairwise correlations
+using a mixture normal prior on Fisher z-scores, with each component centered at the
+same base level z-score value (0 for 0 base correlation) but a wide range of
+data-driven component variances. The method is similar to the adaptive shrinkage method for
+modeling false discovery rates proposed in Stephens 2016 (see reference).
 }
 \examples{
 
-cormat <- get(load(system.file("extdata", "corr_matrix.rda",
-                   package = "CorShrink")))
-nsamp <- get(load(system.file("extdata", "common_samples.rda",
-                             package = "CorShrink")))
-out <- CorShrinkMatrix(cormat, nsamp, image_corshrink  = TRUE, optmethod = "mixEM")
+data("pairwise_corr_matrix")
+data("common_samples")
+out <- CorShrinkMatrix(pairwise_corr_matrix, common_samples)
 
 }
 \references{
-False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216; doi: http://dx.doi.org/10.1101/038216
+False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216;
+             doi: http://dx.doi.org/10.1101/038216
 }
 \keyword{adaptive}
 \keyword{correlation}

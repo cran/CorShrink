@@ -5,7 +5,7 @@
 \title{Adaptive shrinkage of a vector of correlations}
 \usage{
 CorShrinkVector(corvec, nsamp_vec, zscore_sd_vec = NULL, thresh_up = 0.99,
-  thresh_down = -0.99, optmethod = "mixEM", ash.control = list())
+  thresh_down = -0.99, report_model = FALSE, ash.control = list())
 }
 \arguments{
 \item{corvec}{A vector of sample correlations (may contain NAs)}
@@ -15,39 +15,43 @@ for each cell of the vector are estimated.}
 
 \item{zscore_sd_vec}{A vector of the sandard error of the Fisher z-scores for each cell
 in the vector. May contain NA-s as well. The NA-s in this matrix must
-match with the NAs in the \code{corvec} matrix. If provided, it is
-used as default. When set to NULL, asymptotic distribution of the Fisher z-scores is used
-using \code{nsamp_vec}.}
+match with the NAs in \code{corvec}. If provided, it is
+used as default. When set to NULL, asymptotic distribution of the
+Fisher z-scores is used using \code{nsamp_vec}.}
 
-\item{thresh_up}{Upper threshold for correlations. Defaults to 0.99}
+\item{thresh_up}{Upper threshold for correlations in \code{corvec}. Defaults to 0.99}
 
-\item{thresh_down}{Lower threshold for correlations. Defaults to -0.99}
+\item{thresh_down}{Lower threshold for correlations in \code{corvec}. Defaults to -0.99}
 
-\item{optmethod}{The optimization method for EM algorithm - can be one of
-two techniques \code{mixEM} (mixture EM) and \code{mixVBEM}
-(mixture Variational Bayes EM) approaches.The default approach
-is \code{mixEM}.}
+\item{report_model}{if TRUE, outputs the full adaptive shrinkage output, else outputs
+the shrunken vector. Defaults to FALSE.}
 
 \item{ash.control}{The control parameters for adaptive shrinkage}
 }
 \value{
-Returns an adaptively shrunk version of the vector of correlations.
+If \code{report_model = FALSE}, returns an adaptively shrunk version
+        of the vector of correlations. If \code{report_model = TRUE}, then the
+        function also returns all the details of the adaptive shrinkage model output.
 }
 \description{
 This function performs adaptive shrinkage of a
 vector of sample correlations using a mixture normal prior on
-Fisher z-scores with a wide range of grid variances.
+Fisher z-scores , with each component centered at the
+same base level z-score value (0 for 0 base correlation) but a
+wide range of data-driven component variances. The method is similar to the
+adaptive shrinkage method for modeling false discovery rates proposed in
+Stephens 2016 (see reference).
 }
 \examples{
 
  cor_vec <- c(-0.56, -0.4, 0.02, 0.2, 0.9, 0.8, 0.3, 0.1, 0.4)
  nsamp_vec <- c(10, 20, 30, 4, 50, 60, 20, 10, 3)
- out <- CorShrinkVector(corvec = cor_vec, nsamp_vec = nsamp_vec,
-                        optmethod = "mixEM")
+ out <- CorShrinkVector(corvec = cor_vec, nsamp_vec = nsamp_vec)
 
 }
 \references{
-False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216; doi: http://dx.doi.org/10.1101/038216
+False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216;
+             doi: http://dx.doi.org/10.1101/038216
 }
 \keyword{adaptive}
 \keyword{correlation}

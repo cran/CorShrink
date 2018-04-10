@@ -1,84 +1,105 @@
-#' @title Adaptive shrinkage of a matrix of correlations.
+#' @title Adaptive shrinkage of a matrix of pairwise correlations.
 #'
-#' @description This function performs adaptive shrinkage of a sample correlation matrix using a
-#' mixture normal prior on Fisher z-scores with wide range of grid variances.
-#' The method is similar to the adaptive shrinkage method for modeling false discovery rates proposed
-#' in Stephens 2016 (see reference).
+#' @description This function performs adaptive shrinkage of a matrix of pairwise correlations
+#' using a mixture normal prior on Fisher z-scores, with each component centered at the
+#' same base level z-score value (0 for 0 base correlation) but a wide range of
+#' data-driven component variances. The method is similar to the adaptive shrinkage method for
+#' modeling false discovery rates proposed in Stephens 2016 (see reference).
 #'
 #'
-#' @param cormat A table of correlations - not necessarily a correlation matrix.
-#'               May contain NAs as well.
+#' @param cormat A matrix of pairwise correlations - not necessarily a correlation matrix.
+#'               NAs in this matrix are treated as 0.
 #' @param nsamp An integer or a matrix denoting the number of samples for
 #'              each pair of variables over which the correlation has been computed.
-#'              If the user specifies \code{zscore_sd}, then \code{nsamp} is set
-#'              to NULL and is no longer used.
+#'              Only used when \code{zscore_sd} is not provided.
 #' @param zscore_sd A matrix of the sandard error of the Fisher z-scores for each pair of
 #'                 variables. May contain NA-s as well. The NA-s in this matrix must
 #'                 match with the NAs in the \code{cormat} matrix. If provided, it is
 #'                 used as default over the the asymptotic formulation using \code{nsamp}.
 #'                 When set to NULL, asymptotic distribution of the Fisher z-scores is used
 #'                 using \code{nsamp}.
-#' @param thresh_up Upper threshold for correlations. Defaults to 0.99
-#' @param thresh_down Lower threshold for correlations. Defaults to -0.99
-#' @param image_original if TRUE, plots an image of the non-shrunk original matrix
-#'                       of correlations.
-#' @param image_corshrink if TRUE, plots an image of the shrunk matrix
-#'                       of correlations.
+#' @param thresh_up Upper threshold for correlations in \code{cormat}. Defaults to 0.99
+#' @param thresh_down Lower threshold for correlations in \code{cormat}. Defaults to -0.99
+#' @param image character. options for plotting the original or the corshrink matrix.
+#'              If \code{image = "both"}, then the function outputs both the plot
+#'              for original and shrunk correlationmatrix. If \code{image = "original"},
+#'              then the function outputs the correlation plot for the original matrix only.
+#'              If \code{image = "corshrink"}, then the function outputs the correlation plot
+#'              for the CorShrink matrix only.If \code{image = "output"}, then the function
+#'              outputs the saved ggplot figure without displaying it. If \code{image = "null"},
+#'              no image is output. Defaults to "both".
 #' @param tol The tolerance chosen to check how far apart the CorShrink matrix is from the nearest
 #'            positive definite matrix before applying PD completion.
+#'
 #' @param image.control Control parameters for the image when
 #'                      \code{image_original = TRUE} and/or \code{image_corshrink = TRUE}.
-#' @param optmethod The optimization method for EM algorithm - can be one of
-#'                  two techniques \code{mixEM} (mixture EM) and \code{mixVBEM}
-#'                  (mixture Variational Bayes EM) approaches.The default approach
-#'                  is \code{mixEM}.
+#'
+#' @param report_model  if TRUE, outputs the full adaptive shrinkage output, else outputs the shrunken vector.
+#'                      Defaults to FALSE.
 #' @param ash.control The control parameters for adaptive shrinkage
 #'
-#' @return Returns a adaptively shrunk version of the sample correlation matrix before
-#'         and after PD completion.
+#' @return If \code{report_model = FALSE}, returns a list with adaptively shrunk version
+#'         of the sample correlation matrix both before (\code{ash_cor_only}) and after
+#'         PD completion (\code{ash_cor_PD}). If \code{report_model = TRUE}, then the
+#'         function also returns all the details of the adaptive shrinkage model output.
 #'
-#' @references  False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216; doi: http://dx.doi.org/10.1101/038216
+#' @references  False Discovery Rates: A New Deal. Matthew Stephens bioRxiv 038216;
+#'              doi: http://dx.doi.org/10.1101/038216
 #'
 #' @examples
 #'
-#' cormat <- get(load(system.file("extdata", "corr_matrix.rda",
-#'                    package = "CorShrink")))
-#' nsamp <- get(load(system.file("extdata", "common_samples.rda",
-#'                              package = "CorShrink")))
-#' out <- CorShrinkMatrix(cormat, nsamp, image_corshrink  = TRUE,
-#'                        optmethod = "mixEM")
+#' data("pairwise_corr_matrix")
+#' data("common_samples")
+#' out <- CorShrinkMatrix(pairwise_corr_matrix, common_samples)
 #'
 #' @keywords adaptive shrinkage, correlation
 #' @importFrom reshape2 melt dcast
-#' @importFrom grDevices rgb
-#' @importFrom graphics axis
 #' @importFrom stats cor sd
+#' @importFrom corrplot corrplot
+#' @importFrom gridExtra grid.arrange
 #' @importFrom utils modifyList
-#' @import Matrix
-#' @import ashr
-#' @import SQUAREM
+#' @importFrom Matrix nearPD
+#' @importFrom ashr ash
+#' @importFrom grDevices colorRampPalette
+#' @importFrom graphics par
 #' @export
 
 
 CorShrinkMatrix <- function(cormat, nsamp = NULL,
                         zscore_sd = NULL,
                         thresh_up = 0.99, thresh_down = - 0.99,
-                        image_original=FALSE, image_corshrink = FALSE,
+                        image = c("both", "original", "corshrink", "output", "null"),
                         tol=1e-06,
                         image.control = list(),
-                        optmethod = "mixEM",
+                        report_model = FALSE,
                         ash.control = list())
 {
-  image.control.default <- list(x.las = 2,
-                                x.cex = 0.7,
-                                y.las = 2,
-                                y.cex = 0.7,
-                                main_original = "sample corr matrix",
-                                main_corshrink = "CorShrink matrix",
-                                cex.main = 1,
-                                col=c(rev(rgb(seq(1,0,length=1000),1,seq(1,0,length=1000))),
-                                      rgb(1,seq(1,0,length=1000),seq(1,0,length=1000))))
-  image.control <- modifyList(image.control.default, image.control)
+
+  if(length(image) > 1){
+    image <- "null"
+  }
+
+  image.control.default <- list(method = "color", type =  "upper", add = FALSE,
+                                col = colorRampPalette(c("blue", "white", "red"))(200), bg = "white",
+                                title = "", is.corr = TRUE, diag = FALSE,
+                                outline = FALSE, mar = c(0, 0, 0, 0), addgrid.col = NULL,
+                                addCoef.col = NULL, addCoefasPercent = FALSE,
+                                order = c("original", "AOE", "FPC", "hclust", "alphabet"),
+                                hclust.method = c("complete", "ward",
+                                                  "ward.D", "ward.D2", "single", "average",
+                                                  "mcquitty", "median", "centroid"),
+                                addrect = NULL, rect.col = "white", rect.lwd = 2, tl.pos = "td",
+                                tl.cex = 0.8, tl.col = "black", tl.offset = 0.4, tl.srt = 90,
+                                cl.pos = NULL, cl.lim = NULL, cl.length = NULL, cl.cex = 0.8,
+                                cl.ratio = 0.15, cl.align.text = "c", cl.offset = 0.5, number.cex = 1,
+                                number.font = 2, number.digits = NULL, addshade = c("negative",
+                                "positive", "all"), shade.lwd = 1, shade.col = "white", p.mat = NULL,
+                                sig.level = 0.05, insig = c("pch", "p-value", "blank", "n", "label_sig"),
+                                pch = 4, pch.col = "black", pch.cex = 3, plotCI = c("n", "square",
+                               "circle", "rect"), lowCI.mat = NULL, uppCI.mat = NULL, na.label = "?",
+                                na.label.col = "white", win.asp = 1)
+
+  image.control <- utils::modifyList(image.control.default, image.control)
 
   if(is.null(zscore_sd) && is.null(nsamp)){
     stop("User must provide wither an nsamp or a zscore_sd arguments")
@@ -106,10 +127,12 @@ CorShrinkMatrix <- function(cormat, nsamp = NULL,
 
   ash.control.default = list(pointmass = TRUE,
                              mixcompdist = "normal", nullweight = 10,
-                             fixg = FALSE, mode = 0,
+                             fixg = FALSE, mode = 0, optmethod = "mixEM",
                              prior = "nullbiased", gridmult = sqrt(2),
                              outputlevel = 2, alpha = 0,
-                             df = NULL)
+                             df = NULL, control = list(K = 1,
+                             method=3, square=TRUE, step.min0=1, step.max0=1,
+                             mstep=4, kr=1, objfn.inc=1,tol=1.e-05, maxiter=100, trace=FALSE))
   ash.control <- modifyList(ash.control.default, ash.control)
 
   ##################   vectorise the correlation matrix  ###################
@@ -163,8 +186,7 @@ CorShrinkMatrix <- function(cormat, nsamp = NULL,
   ##################   Adaptive Shrinkage (Fisher Z scores) ################
 
   fit=do.call(ashr::ash, append(list(betahat = cor_transform_mean_vec,
-                                     sebetahat = cor_transform_sd_vec,
-                                     optmethod = optmethod),
+                                     sebetahat = cor_transform_sd_vec),
                                 ash.control))
 
 
@@ -196,30 +218,65 @@ CorShrinkMatrix <- function(cormat, nsamp = NULL,
   row_labs <- rownames(cormat)
   col_labs <- colnames(cormat)
 
+  if(image == "original"){
+     image_original <- TRUE
+     image_corshrink <- FALSE
+   }
+  if(image == "corshrink"){
+     image_corshrink <- TRUE
+     image_original <- FALSE
+  }
+  if(image == "output"){
+    image_original = TRUE
+    image_corshrink = TRUE
+  }
+  if(image == "both"){
+    par(mfrow=c(1,2))
+    image_original = TRUE
+    image_corshrink = TRUE
+  }
+  if(image == "null"){
+    image_original = FALSE
+    image_corshrink = FALSE
+  }
+
    if(image_original) {
-      image(as.matrix(cormat), col=image.control$col, main = image.control$main_original,
-            cex.main=image.control$cex.main, xaxt = "n", yaxt = "n", zlim=c(-1,1))
-      axis(1, at = seq(0, 1, length.out = ncol(cormat)),
-           labels = row_labs, las=image.control$x.las, cex.axis = image.control$x.cex)
-      axis(2, at = seq(0, 1, length.out = ncol(cormat)),
-           labels = col_labs, las=image.control$y.las, cex.axis = image.control$y.cex)
+      do.call(corrplot::corrplot, append(list(corr = as.matrix(cormat)),
+                                            image.control))
    }
 
     if(image_corshrink){
-      image(as.matrix(ash_cor_PD), col=image.control$col, main=image.control$main_corshrink,
-            cex.main=image.control$cex.main, xaxt = "n", yaxt = "n", zlim=c(-1,1))
-      axis(1, at = seq(0, 1, length.out = ncol(cormat)),
-           labels = row_labs, las=image.control$x.las, cex.axis = image.control$x.cex)
-      axis(2, at = seq(0, 1, length.out = ncol(cormat)),
-           labels = col_labs, las=image.control$y.las, cex.axis = image.control$y.cex)
+      do.call(corrplot::corrplot, append(list(corr = as.matrix(ash_cor_PD)),
+                                             image.control))
     }
 
-  if(all.equal(target=ash_cor_only, current=ash_cor_PD, tolerance=tol)==TRUE){
-    message("ash cor only and ash cor PD matrices are same")
-  }else{
-    message("ash cor only and ash cor PD matrices are different")
+  ash_cor_PD <- as.matrix(ash_cor_PD)
+
+  if(!is.null(rownames(cormat)) && !is.null(colnames(cormat))){
+    rownames(ash_cor_only) <- rownames(cormat)
+    colnames(ash_cor_only) <- colnames(cormat)
+    rownames(ash_cor_PD) <- rownames(cormat)
+    colnames(ash_cor_PD) <- colnames(cormat)
   }
-  ll <- list("ash_cor_only"= ash_cor_only, "ash_cor_PD"=as.matrix(ash_cor_PD))
+
+  if(report_model){
+    ll <- list("cor_before_PD"= ash_cor_only,
+               "cor"= ash_cor_PD,
+               "model" = fit)
+  }else{
+    ll <- list("cor_before_PD"= ash_cor_only, "cor"= ash_cor_PD)
+  }
+
+   # if(image == "both"){
+   #   gridExtra::grid.arrange(out1, out2, nrow = 1)
+   # }else if (image == "original"){
+   #   print(out1)
+   # }else if (image == "corshrink"){
+   #   print(out2)
+   # }else if (image == "output"){
+   #   ll[["image"]] = out2
+   # }
+
   return(ll)
 }
 
