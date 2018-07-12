@@ -32,11 +32,6 @@ opts_chunk$set(tidy=FALSE,tidy.opts=list(width.cutoff=30),dev="png",fig.show="hi
                message=FALSE, warning = FALSE)
 ```
 
-
-```{r style, eval=FALSE, echo=FALSE, results='asis'}
-BiocStyle::markdown()
-```
-
 # Introduction
 
 Estimation of covariance or correlation matrices has widespread usage in a broad spectrum of statistical applications. The most commonly used estimator, namely the sample covariance or correlation matrix, is rank deficient and hence unstable in cases where the dimensionality of the problem (p) is greater than the number of samples (n). This problem has driven statisticians to suggest various alternative estimators in \textit{small n, large p} settings. Several estimators of correlation matrix have been proposed in such settings and their theoretical properties and performance comparisons have been studied comprehensively [@touloumis2015nonparametric, @ledoit2003improved, @bickel2008, @rothman2009]. Some of these methods are already available as R packages - **corpcor** [@schafer2004empirical], **glasso** [@friedman2008sparse], **PDSCE** [@rothman2009] etc. 
@@ -50,7 +45,7 @@ These approaches, however,  are not  well suited for handling large scale missin
 **CorShrink** is a companion package to **ashr** R package [@stephens2016false]. Before installing **CorShrink**, please make sure you have the latest version of **ashr**.
 
 ```{r install_ash, eval=FALSE}
-devtools::install_github("stephens999/ashr")
+install.packages("ashr")
 ```
 
 The other dependencies of this package include **SQUAREM**, **reshape2** and **Matrix**. Next we install **CorShrink**. 
@@ -103,7 +98,7 @@ $$  R^{\star}_{ij} = \frac{exp \; (2 Z^{\star}_{ij}) - 1}{exp \; (2 Z^{\star}_{i
 
 # Illustration
 
-We load an example data matrix - the person (544) by tissue samples (53) gene expression data for the gene *ENSG00000166819* collected from the *Genotype Tissue Expression (GTEx) Project* .
+We load an example data matrix - the person (544) by tissue samples (53) gene expression data for the gene *ENSG00000166819* collected from the [Genotype Tissue Expression (GTEx) Project](https://www.gtexportal.org/home/) .
 
 ```{r load_data, eval=TRUE, warning = FALSE}
 data("sample_by_feature_data")
@@ -124,7 +119,7 @@ We estimate the adaptively shrunk correlation matrix for this data using **CorSh
 
 ```{r corshrink_data, eval=TRUE, warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=13, fig.height=10}
 out <- CorShrinkData(sample_by_feature_data, sd_boot = FALSE, image = "both",
-                     image.control = list(tl.cex = 0.5))
+                     image.control = list(tl.cex = 0.8))
 ```
 
 The function outputs a list with two elements which are two versions of CorShrink estimated matrices  - `cor` and `cor_before_PD`.`cor` is the nearest positive definite approximation ($R^{{\star}{\star}}$) to `cor_before_PD` version ($R^{{\star}}$) as described in the methods above. When `image = "both"`, the function plots the images for both these versions.
@@ -144,7 +139,7 @@ out$cor[1:5, 1:5]
 data("pairwise_corr_matrix")
 data("common_samples")
 out <- CorShrinkMatrix(pairwise_corr_matrix, common_samples, image = "both",
-                       image.control = list(tl.cex = 0.4))
+                       image.control = list(tl.cex = 0.8))
 ```
 
 ### *CorShrinkVector*
@@ -168,7 +163,7 @@ We have so far looked at *CorShrinkData*, *CorShrinkMatrix* and *CorShrinkVector
 
 ```{r corshrink_data_boot, eval=TRUE, warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=13, fig.height=10}
 out <- CorShrinkData(sample_by_feature_data, sd_boot = TRUE, image = "both",
-                     image.control = list(tl.cex = 0.4))
+                     image.control = list(tl.cex = 0.8))
 ```
 
 The algorithm works by first computing a Bootstrap estimate of the standard error of the Fisher z-scores for each pair and then using this estimate together with the correlations to shrink the latter. 
@@ -180,7 +175,59 @@ The breakdown can be formulated at the level of a correlation matrix as follows.
 ```{r corshrink_mat_boot, eval=TRUE, warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=13, fig.height=10}
 zscoreSDmat <- bootcorSE_calc(sample_by_feature_data, verbose = FALSE)
 out <- CorShrinkMatrix(pairwise_corr_matrix, zscore_sd = zscoreSDmat, image = "both",
-                       image.control = list(tl.cex = 0.4))
+                       image.control = list(tl.cex = 0.8))
+```
+
+## *pCorShrink*
+
+We can use the *pCorShrinkData* function to adaptively shrink partial correlations. This approach is 
+analogous to GLASSO, CLIME and other sparse graphical model methods, but **pCorShrinkData** shrinks the edge weights in the graph to 0 adaptively.
+
+As per current implementation *pCorShrinkData* does not handle missing observations in the data matrix. So, we demonstrate the use of this method on a fully observed simulated data.
+
+### Simulated setting
+
+```{r warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=18, fig.height=15}
+library(Matrix)
+n <- 500
+P <- 100
+block <- 10
+mat <- 0.3*diag(1,block) + 0.7*rep(1,block) %*% t(rep(1, block))
+Sigma <-   Matrix::bdiag(mat, mat, mat, mat, mat, mat, mat, mat, mat, mat)
+corSigma <- cov2cor(Sigma)
+pcorSigma <- corpcor::cor2pcor(corSigma)  ##  true partial correlation matrix
+```
+
+### Generate Data
+
+```{r}
+##################  Generate data   ################
+
+data <- MASS::mvrnorm(n,rep(0,P),Sigma)
+```
+
+### pCorShrinkData
+
+```{r warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=18, fig.height=15}
+out1 <- pCorShrinkData(data, reg_type = "lm")
+```
+
+### Visualization
+
+```{r warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=10,  fig.height=8}
+library(corrplot)
+col2 <- c("blue", "white", "red")
+par(mfrow=c(1,2))
+corrplot::corrplot(pcorSigma, diag = FALSE,
+         col = colorRampPalette(col2)(200),
+         tl.pos = "td", tl.cex = 0.2, tl.col = "black",
+         rect.col = "white",na.label.col = "white", mar=c(2,2,2,2),
+         method = "color", type = "upper", title = "original")
+corrplot::corrplot(out1, diag = FALSE,
+         col = colorRampPalette(col2)(200),
+         tl.pos = "td", tl.cex = 0.2, tl.col = "black",
+         rect.col = "white",na.label.col = "white", mar=c(2,2,2,2),
+         method = "color", type = "upper", title = "pCorShrink")
 ```
 
 ---
@@ -194,9 +241,9 @@ One can choose a fixed non-zero target in `mode` as well.
 ```{r extras_1, eval=TRUE, warning = FALSE, message=FALSE, fig.align = "left", fig.show="asis", dpi=50, fig.width=13, fig.height=10}
 
 par(mfrow=c(1,2))
-out1 <- CorShrinkData(sample_by_feature_data, sd_boot = FALSE, image = "corshrink",             image.control = list(title = "CorShrink (target = 0)", tl.cex = 0.4))
+out1 <- CorShrinkData(sample_by_feature_data, sd_boot = FALSE, image = "corshrink",             image.control = list(title = "CorShrink (target = 0)", tl.cex = 0.8))
 out2 <- CorShrinkData(sample_by_feature_data, sd_boot = FALSE, image = "corshrink",                      ash.control = list(mode = "estimate"),
-    image.control = list(title = "CorShrink (target = estimated)", tl.cex = 0.4))
+    image.control = list(title = "CorShrink (target = estimated)", tl.cex = 0.8))
 
 ```
 
@@ -208,16 +255,16 @@ In general, *CorShrink* assumes a normal prior for the population Fisher z-score
 par(mfrow=c(2,2))
 out1 <- CorShrinkData(sample_by_feature_data,sd_boot = FALSE, image ="corshrink", 
                      ash.control = list(mixcompdist = "normal"),
-                     image.control = list(tl.cex = 0.4))
+                     image.control = list(tl.cex = 0.6))
 out2 <- CorShrinkData(sample_by_feature_data,sd_boot = FALSE, image ="corshrink", 
                      ash.control = list(mixcompdist = "uniform"),
-                     image.control = list(tl.cex = 0.4))
+                     image.control = list(tl.cex = 0.6))
 out3 <- CorShrinkData(sample_by_feature_data,sd_boot = FALSE, image ="corshrink", 
                      ash.control = list(mixcompdist = "halfuniform"),
-                     image.control = list(tl.cex = 0.4))
+                     image.control = list(tl.cex = 0.6))
 out4 <- CorShrinkData(sample_by_feature_data,sd_boot = FALSE, image ="corshrink",  
                      ash.control = list(mixcompdist = "+uniform"),
-                     image.control = list(tl.cex = 0.4))
+                     image.control = list(tl.cex = 0.6))
 
 ```
 

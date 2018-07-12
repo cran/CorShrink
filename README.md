@@ -23,12 +23,20 @@ the following paper:
 
 ## Methods Overview
 
-A companion package to the **ashr** R package by Matthew Stephens [see paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5379932/), **CorShrink** adaptive shrinks correlation between a pair of variables based on the number of pairwise complete observations. **CorShrink** can be applied to a vector or matrix of pairwise correlations and can also be generalized to quantities similar in nature to correlations - like partial correlations, rank correlations and cosine simialrities from word2vec model. **CorShrink** when applied to a data matrix, is able to learn an individual shrinkage intensity for a pair of variables from the number of missing observations between each such pair - which allows the method to handle large scale missing observations (a demo of which is presented in the example below). 
+A companion package to the [ashr](https://github.com/stephens999/ashr) package by Matthew Stephens [see paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5379932/), **CorShrink** adaptive shrinks correlation between a pair of variables based on the number of pairwise complete observations. **CorShrink** can be applied to a vector or matrix of pairwise correlations and can also be generalized to quantities similar in nature to correlations - like partial correlations, rank correlations and cosine simialrities from word2vec model. **CorShrink** when applied to a data matrix, is able to learn an individual shrinkage intensity for a pair of variables from the number of missing observations between each such pair - which allows the method to handle large scale missing observations (a demo of which is presented in the example below). 
 
 
 ## Quick Start
 
-The instructions for installing and loading the package are as follows.
+The instructions for installing the package are as follows.
+
+*For CRAN version*:
+
+```
+install.packages("CorShrink")
+```
+
+*For the development version*: 
 
 ```
 library(devtools)
@@ -69,7 +77,7 @@ We use **CorShrink** to estimate the correlation matrix taking account of the mi
 out <- CorShrinkData(sample_by_feature_data, sd_boot = FALSE, image = "both",
                     image.control = list(tl.cex = 0.2))                            
 ```
-<img src="inst/doc/plot1.png" alt="Structure Plot" height="800" width="800">
+<img src="inst/doc/plot1.png" alt="Structure Plot" height="700" width="900">
 
 
 The above approach uses an asymototic version of CorShrink. Alternatively, one can use a re-sampling or Bootstrapping approach.
@@ -79,7 +87,7 @@ out <- CorShrinkData(sample_by_feature_data, sd_boot = TRUE, image = "both",
                     image.control = list(tl.cex = 0.2))
 ```
 
-<img src="inst/doc/plot2.png" alt="Structure Plot" height="800" width="800">
+<img src="inst/doc/plot2.png" alt="Structure Plot" height="700" width="900">
 
 Walk through some more detailed examples in the
 [vignette](vignettes/corshrink.Rmd):
